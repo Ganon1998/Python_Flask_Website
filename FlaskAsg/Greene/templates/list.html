@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+</head>
+<body data-gr-c-s-loaded="true" style="...">
+
+<table border="1">
+    <thead>
+    <tr><td>Name</td>
+    <td>Alias</td>
+    <td>Security Level</td>
+    <td>Login Password</td>
+    </tr></thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+        <td>{{row["Name"]}}</td>
+        <td>{{row["Alias"]}}</td>
+        <td>{{row["SecurityLevel"]}}</td>
+        <td>{{row["LoginPassword"]}}</td>
+    </tr>
+    {% endfor %}
+    <h2><a href="/">back to home </a></h2>
+    </tbody>
+</table>
+
+</body>
+</html>
