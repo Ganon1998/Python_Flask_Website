@@ -5,7 +5,11 @@
 </head>
 <body data-grc-c-s-loaded="true" style="...">
 
-Query Result : {{ msg }} {{ msg1 }} {{ msg2 }} {{ msg3 }}
+{% for i in range(0,5) %}
+    <tr>
+        <td>{{ msg[i] }}</td>
+    </tr>
+{% endfor %}
 <h2><a href="/">back to home </a></h2>
 
 </body>

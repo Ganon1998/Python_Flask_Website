@@ -7,19 +7,18 @@ cur = conn.cursor()
 
 conn.commit()
 
-cur.execute('''DROP TABLE SecretAgent''')
+try:
+    cur.execute('''DROP TABLE SecretAgent''')
+    conn.commit()
+except:
+    pass
 
 # create a new table
 cur.execute('''CREATE TABLE SecretAgent(
-Name CHAR(40),
-Alias CHAR(20),
+AgentID INTEGER PRIMARY KEY,
+Name TEXT NOT NULL,
+Alias TEXT NOT NULL,
 SecurityLevel INT,
-LoginPassword CHAR(20));''')
-
-conn.commit()
-
-# inserts 6 rows into the table
-cur.execute('''INSERT INTO SecretAgent (Name, Alias, SecurityLevel, LoginPassword)
-VALUES('Princess Diana', 'Lady Di', 1, 'test123');''')
+LoginPassword TEXT NOT NULL);''')
 
 conn.commit()

@@ -1,16 +1,17 @@
 import sqlite3 as sql
 import sys
-
+import pandas as pd
+import Encrypt
 from flask import Flask, render_template, request, session, flash
 import os
 
 """
 
 Name: Jordan Greene
-Date:2/3/2021
-Assignment: (Assignment #5)
-Due Date: 2/7/2021
-About this project: Add a login page and maintain sessions throughout the traversal of the website.
+Date:2/10/2021
+Assignment: (Assignment #6)
+Due Date: 2/14/2021
+About this project: Add data encryption when storing information about the user and other users.
 
 """
 
@@ -29,7 +30,7 @@ def home():
 # function for when the user wants to add a new agent
 @app.route('/enternew')
 def new_Secret_Agent():
-    if not session.get('logged_in'):
+    if not session.get('logged_in') or session.get('SecurityLevel') != 1:
         return render_template('login.html')
     else:
         return render_template('agent.html')
@@ -39,13 +40,20 @@ def new_Secret_Agent():
 # only runs if the person is logged in
 @app.route('/addrec', methods=['POST', 'GET'])
 def addrec():
-    if session.get('logged_in'):
+    if session.get('logged_in') and session.get('SecurityLevel') == 1:
         if request.method == 'POST':
             try:
                 name = request.form['Name']
                 alias = request.form['Alias']
                 secureLv = request.form['Security Level']
                 login = request.form['Login Password']
+
+                # encrypt the information before accessing the database
+                ename = str(Encrypt.cipher.encrypt(bytes(name, 'utf-8')).decode("utf-8"))
+                ealias = str(Encrypt.cipher.encrypt(bytes(alias, 'utf-8')).decode("utf-8"))
+                elogin = str(Encrypt.cipher.encrypt(bytes(login, 'utf-8')).decode("utf-8"))
+
+                MessagesArray = [" " for x in range(5)]
 
                 messageName = "Please don't leave Name empty. Try again"
                 messageAl = "Please don't leave Alias empty. Try again"
@@ -58,56 +66,82 @@ def addrec():
                     with sql.connect("AgentDB.db") as con:
 
                         cur = con.cursor()
-                        cur.execute("INSERT INTO SecretAgent VALUES (?,?,?,?)", (name, alias, secureLv, login))
+                        cur.execute("INSERT INTO SecretAgent VALUES (6,?,?,?,?)", (ename, ealias, secureLv, elogin))
                         con.commit()
                         message = "Record successfully added"
+                        MessagesArray[0] = message
 
             except:
                 con.rollback()
                 message = "error in insert operation"
+                MessagesArray[0] = message
 
             finally:
 
                 # error checking for empty inputs
                 if not name:
-                    return render_template("result.html", msg=messageName)
+                    MessagesArray[1] = messageName
                 if not alias:
-                    return render_template("result.html", msg=messageAl)
+                    MessagesArray[2] = messageAl
                 if not secureLv or int(secureLv) > 10 or int(secureLv) < 1:
-                    return render_template("result.html", msg=messageSecLv)
+                    MessagesArray[3] = messageSecLv
                 if not login:
-                    return render_template("result.html", msg=messageLogin)
+                    MessagesArray[4] = messageLogin
 
-                return render_template("result.html", msg=message)
+                return render_template("result.html", msg=MessagesArray)
 
             con.close()
     else:
-        return render_template('result.html', msg=" Page not found.")
+        return render_template('login.html')
 
 
 # this function list all the rows in the SecretAgent table from AgentDB.db
 # this only runs if the person is logged in
 @app.route('/list')
 def list():
-    if session.get('logged_in'):
+    if session.get('logged_in') and session.get('SecurityLevel') < 3:
         con = sql.connect("AgentDB.db")
         con.row_factory = sql.Row
 
         cur = con.cursor()
         cur.execute("SELECT * FROM SecretAgent")
+        Info = pd.DataFrame(cur.fetchall(), columns=['AgentID','Name', 'Alias','SecurityLevel', 'LoginPassword'])
 
-        rows = cur.fetchall()
-        return render_template("list.html", rows=rows)
+        # decrypt the info from the database
+        index = 0
+        for i in Info['Name']:
+            i = str(Encrypt.cipher.decrypt(i))
+            Info._set_value(index, 'Name', i)
+            index += 1
+
+        index = 0
+        for i in Info['Alias']:
+            i = str(Encrypt.cipher.decrypt(i))
+            Info._set_value(index, 'Alias', i)
+            index += 1
+
+        index = 0
+        for i in Info['LoginPassword']:
+            i = str(Encrypt.cipher.decrypt(i))
+            Info._set_value(index, 'LoginPassword', i)
+            index += 1
+
+        con.close()
+        return render_template("list.html", rows=Info)
     else:
-        return render_template('result.html', msg=" Page not found.")
+        return home()
 
 
 # login function
-@app.route('/login', methods=['POST', 'GET'])
+@app.route('/login', methods=['POST'])
 def login():
     try:
         nm = request.form['username']
         password = request.form['password']
+
+        # encrypt name and password after receiving info
+        ename = str(Encrypt.cipher.encrypt(bytes(nm, 'utf-8')).decode("utf-8"))
+        elogin = str(Encrypt.cipher.encrypt(bytes(password, 'utf-8')).decode("utf-8"))
 
         # get connection to database
         with sql.connect("AgentDB.db") as con:
@@ -116,17 +150,16 @@ def login():
             cur = con.cursor()
 
             sql_select_query = '''SELECT * FROM SecretAgent WHERE Name = ? AND LoginPassword = ?'''
-            cur.execute(sql_select_query, (nm, password))
+            cur.execute(sql_select_query, (ename, elogin))
 
             row = cur.fetchone()
-
-            # checks to see if the row retreived is actually in the database or not
+            # checks to see if the row retrieved is actually in the database or not
             if row != None:
                 session['name'] = nm
                 session['logged_in'] = True
                 session['SecurityLevel'] = int(row['SecurityLevel'])
-                # go to home.html with info about the person who logged in via secureLv
-                # the secureLv determines what the user is allowed to see on the homepage.
+                # go to home.html with info about the person who logged in via session SecurityLevel
+                # the SecurityLevel determines what the user is allowed to see on the homepage.
                 return render_template("home.html")
             else:
                 session['logged_in'] = False
@@ -147,6 +180,7 @@ def login():
 def logout():
     session['name'] = ""
     session['logged_in'] = False
+    session['SecurityLevel'] = 3
     return home()
 
 

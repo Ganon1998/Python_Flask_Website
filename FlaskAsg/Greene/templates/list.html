@@ -6,24 +6,20 @@
 <body data-gr-c-s-loaded="true" style="...">
 
 <table border="1">
-    <thead>
-    <tr><td>Name</td>
-    <td>Alias</td>
-    <td>Security Level</td>
-    <td>Login Password</td>
-    </tr></thead>
+   <thead>
+      <tr><td>Agent Name</td>
+      <td>Agent Alias</td>
+      <td>Agent Security Level</td>
+   </tr></thead>
     <tbody>
-    {% for row in rows %}
+    {% for row in rows.itertuples() %}
     <tr>
-        <td>{{row["Name"]}}</td>
-        <td>{{row["Alias"]}}</td>
-        <td>{{row["SecurityLevel"]}}</td>
-        <td>{{row["LoginPassword"]}}</td>
-    </tr>
-    {% endfor %}
-    <h2><a href="/">back to home </a></h2>
-    </tbody>
-</table>
+         <td>{{row[1]}}</td>
+         <td>{{row[2]}}</td>
+         <td>{{row[3]}}</td>
+      </tr>
+{% endfor %}
+    </tbody></table>
 
 </body>
 </html>
