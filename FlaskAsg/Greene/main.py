@@ -4,19 +4,20 @@ import pandas as pd
 import Encrypt
 from flask import Flask, render_template, request, session, flash
 import os
+import socket
 
 """
 
 Name: Jordan Greene
-Date:2/10/2021
-Assignment: (Assignment #6)
-Due Date: 2/14/2021
-About this project: Add data encryption when storing information about the user and other users.
+Date:2/20/2021
+Assignment: (Assignment #7)
+Due Date: 2/21/2021
+About this project: Setup a server to receive messages from client and store a record of this in Messages Table.
 
 """
 
 app = Flask(__name__)
-
+MessagesArray = [" " for x in range(5)]
 
 # default page that's loaded
 @app.route('/')
@@ -31,7 +32,9 @@ def home():
 @app.route('/enternew')
 def new_Secret_Agent():
     if not session.get('logged_in') or session.get('SecurityLevel') != 1:
-        return render_template('login.html')
+        Message[5] = [" " for x in range(5)]
+        Message[0] = "Query Result: Page Not Found"
+        return render_template('result.html', msg=Message)
     else:
         return render_template('agent.html')
 
@@ -66,7 +69,7 @@ def addrec():
                     with sql.connect("AgentDB.db") as con:
 
                         cur = con.cursor()
-                        cur.execute("INSERT INTO SecretAgent VALUES (6,?,?,?,?)", (ename, ealias, secureLv, elogin))
+                        cur.execute("INSERT INTO SecretAgent (Name, Alias, SecurityLevel, LoginPassword) VALUES (?,?,?,?)", (ename, ealias, secureLv, elogin))
                         con.commit()
                         message = "Record successfully added"
                         MessagesArray[0] = message
@@ -105,7 +108,7 @@ def list():
 
         cur = con.cursor()
         cur.execute("SELECT * FROM SecretAgent")
-        Info = pd.DataFrame(cur.fetchall(), columns=['AgentID','Name', 'Alias','SecurityLevel', 'LoginPassword'])
+        Info = pd.DataFrame(cur.fetchall(), columns=['MessageID', 'AgentID','Name', 'Alias','SecurityLevel', 'LoginPassword'])
 
         # decrypt the info from the database
         index = 0
@@ -182,6 +185,69 @@ def logout():
     session['logged_in'] = False
     session['SecurityLevel'] = 3
     return home()
+
+
+@app.route('/message')
+def help():
+    if not session.get('logged_in'):
+        return render_template('login.html')
+    else:
+        return render_template('SendMsg.html', name=session['name'])
+
+# function that controls message
+@app.route('/message', methods=['POST'])
+def message():
+    if not session.get('logged_in'):
+        return render_template('login.html')
+    else:
+        if request.method == 'POST':
+            try:
+                # connect to database to get agentID
+                with sql.connect("AgentDB.db") as con:
+                    # setup variables for connection to server and encrypt message
+                    msg = request.form['message']
+                    HOST, PORT = "localhost", 9999
+
+                    MessagesArray[0] = "You can not enter in an empty message"
+
+                    # if a message was actually typed in
+                    if msg:
+                        # get name
+                        nm = session.get('name')
+                        enm = str(Encrypt.cipher.encrypt(bytes(nm, 'utf-8')).decode("utf-8"))
+
+                        # setup cursor
+                        con.row_factory = sql.Row
+                        cur = con.cursor()
+
+                        # get access to the Agentdb to get ID
+                        sql_select_query = '''SELECT * FROM SecretAgent WHERE Name = ? AND SecurityLevel = ?'''
+                        cur.execute(sql_select_query, (enm, session.get('SecurityLevel')))
+                        row = cur.fetchone()
+                        session['ID'] = str(row['AgentID'])
+
+                        # add ID to the message and add a marker so the split() know what to split
+                        data = session.get('ID') + ":::::::::::" + msg
+                        data = str(Encrypt.cipher.encrypt(bytes(data, 'utf-8')).decode("utf-8"))
+
+                        # get sockets ready and connect to host, send all, then close
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        sock.connect((HOST, PORT))
+                        sock.sendall(bytes(data, "utf-8"))
+                        sock.close()
+
+                        # success message
+                        MessagesArray[0] = "Message successfully sent to boss"
+                    else:
+                        return render_template("result.html", msg=MessagesArray)
+
+
+            except sock.error as e:
+                MessagesArray[0] = "Error - Message NOT sent to boss"
+            finally:
+                con.close()
+                return render_template("result.html", msg=MessagesArray)
+
 
 
 if __name__ == '__main__':

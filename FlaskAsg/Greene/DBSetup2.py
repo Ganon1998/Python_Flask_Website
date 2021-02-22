@@ -89,3 +89,5 @@ print("\n")
 print("LoginPasswords: ")
 for i in Info['LoginPassword']:
     print(i)
+
+conn.close()
