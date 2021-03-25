@@ -5,14 +5,15 @@ import Encrypt
 from flask import Flask, render_template, request, session, flash
 import os
 import socket
+import hmac, hashlib, _sha3
 
 """
 
 Name: Jordan Greene
-Date:2/20/2021
-Assignment: (Assignment #7)
-Due Date: 2/21/2021
-About this project: Setup a server to receive messages from client and store a record of this in Messages Table.
+Date: 3/21/2021
+Assignment: (Assignment #10)
+Due Date: 3/21/2021
+About this project: Have a process run using threadinge.
 
 """
 
@@ -206,21 +207,20 @@ def message():
                 with sql.connect("AgentDB.db") as con:
                     # setup variables for connection to server and encrypt message
                     msg = request.form['message']
-                    HOST, PORT = "localhost", 9999
-
-                    MessagesArray[0] = "You can not enter in an empty message"
+                    HOST, PORT = "localhost", 8888
+                    MessagesArray[0] = "Error - Message NOT sent to boss"
 
                     # if a message was actually typed in
-                    if msg:
+                    if msg and not msg.isspace():
                         # get name
                         nm = session.get('name')
-                        enm = str(Encrypt.cipher.encrypt(bytes(nm, 'utf-8')).decode("utf-8"))
+                        enm = str(Encrypt.cipher.encrypt(bytes(nm, 'utf-8')).decode('utf-8'))
 
                         # setup cursor
                         con.row_factory = sql.Row
                         cur = con.cursor()
 
-                        # get access to the Agentdb to get ID
+                        # get ID from database
                         sql_select_query = '''SELECT * FROM SecretAgent WHERE Name = ? AND SecurityLevel = ?'''
                         cur.execute(sql_select_query, (enm, session.get('SecurityLevel')))
                         row = cur.fetchone()
@@ -228,22 +228,32 @@ def message():
 
                         # add ID to the message and add a marker so the split() know what to split
                         data = session.get('ID') + ":::::::::::" + msg
-                        data = str(Encrypt.cipher.encrypt(bytes(data, 'utf-8')).decode("utf-8"))
+
+                        # create tag
+                        secret = b'1234'
+                        computedTag = hmac.new(secret, bytes(data, 'utf-8'), digestmod=hashlib.sha3_512).digest()
+
+                        # encrypt the data then append tag
+                        data = str(Encrypt.cipher.encrypt(bytes(data, 'utf-8')).decode('utf-8')) + str(computedTag)
 
                         # get sockets ready and connect to host, send all, then close
                         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         sock.connect((HOST, PORT))
-                        sock.sendall(bytes(data, "utf-8"))
+                        sock.sendall(bytes(data, 'utf-8'))
                         sock.close()
 
                         # success message
                         MessagesArray[0] = "Message successfully sent to boss"
+
+                    elif msg.strip() == "":
+                        MessagesArray[0] = "You can not enter in an empty message"
+                        return render_template("result.html", msg=MessagesArray)
                     else:
                         return render_template("result.html", msg=MessagesArray)
 
-
-            except sock.error as e:
+            except Exception as e:
                 MessagesArray[0] = "Error - Message NOT sent to boss"
+
             finally:
                 con.close()
                 return render_template("result.html", msg=MessagesArray)

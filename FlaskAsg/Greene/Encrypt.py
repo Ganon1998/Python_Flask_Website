@@ -1,6 +1,5 @@
 from Cryptodome.Cipher import AES
-
-import string,base64
+import string, base64
 
 
 class AESCipher(object):
@@ -15,10 +14,18 @@ class AESCipher(object):
         return encoded
 
     def decrypt(self, raw):
-        decoded = base64.b64decode(raw)
-        self.cipher = AES.new(self.key, AES.MODE_CFB,self.iv)
+        decoded = base64.b64decode(raw + b'===')
+        self.cipher = AES.new(self.key, AES.MODE_CFB, self.iv)
         decrypted = self.cipher.decrypt(decoded)
-        return str(decrypted, 'utf-8')
+        try:
+            return str(decrypted, 'utf-8')
+        except:
+            try:
+                return str(decrypted, 'cp1252')
+
+            except Exception as e:
+                print('unable to decrypt message: ', e)
+                raise Exception('unable to decrypt message')
 
 
 
